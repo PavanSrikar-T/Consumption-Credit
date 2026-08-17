@@ -10,7 +10,28 @@ export type EligibilityResult = {
   timeline: { status: string; timestamp: string }[];
 };
 
+export type CibilResult = {
+  score: number | null;
+  reason?: string;
+};
+
 export const eligibilityApi = {
+  fetchCibilScore: async (vpa: string, pan: string): Promise<CibilResult> => {
+    if (isMockMode()) {
+      const isBadCredit = vpa.toLowerCase().includes('bad') || pan.toLowerCase().includes('poor');
+      const isThinFile = vpa.toLowerCase().includes('thin') || vpa.toLowerCase().includes('new') || pan.toLowerCase().includes('new');
+
+      if (isThinFile) {
+        return { score: null };
+      }
+      if (isBadCredit) {
+        return { score: 550, reason: 'Rejected due to low external bureau score.' };
+      }
+      return { score: 750 };
+    }
+    return { score: 0 };
+  },
+
   evaluateEligibility: async (vpa: string, name: string, pan: string): Promise<EligibilityResult> => {
     if (isMockMode()) {
       const timeline: { status: string; timestamp: string }[] = [];

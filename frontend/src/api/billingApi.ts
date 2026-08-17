@@ -12,27 +12,61 @@ export const billingApi = {
     return response.data;
   },
 
-  payBill: async (amount: number): Promise<{ success: boolean; newBalance: number }> => {
+  payBill: async (amount: number): Promise<{ 
+    success: boolean; 
+    newBalance: number; 
+    repaymentDetails?: { lenderName: string; amount: number }[];
+    limitIncreases?: { lenderName: string; amount: number }[];
+  }> => {
     if (isMockMode()) {
       await delay(1000);
-      
-      const primaryLine = mockCreditLines[0];
 
       mockStatement.totalAmountDue = Math.max(0, mockStatement.totalAmountDue - amount);
       mockStatement.amountPaid = (mockStatement.amountPaid || 0) + amount;
       
-      if (primaryLine) {
-        primaryLine.availableLimit += amount;
-        primaryLine.utilizedLimit -= amount;
-        
-        // Auto-increase health score if they pay bill early/on-time
-        if (primaryLine.health.behaviorScore < 100) {
-          primaryLine.health.behaviorScore = Math.min(100, primaryLine.health.behaviorScore + 5);
-          if (primaryLine.health.behaviorScore >= 90) {
-            primaryLine.health.riskLevel = 'LOW';
+      let remainingPayment = amount;
+      const repaymentDetails: { lenderName: string; amount: number }[] = [];
+      const limitIncreases: { lenderName: string; amount: number }[] = [];
+      const isEarlyRepayment = new Date() <= new Date(mockStatement.dueDate);
+
+      for (const line of mockCreditLines) {
+        if (remainingPayment <= 0) break;
+        if (line.utilizedLimit > 0) {
+          const toPay = Math.min(line.utilizedLimit, remainingPayment);
+          line.utilizedLimit -= toPay;
+          line.availableLimit += toPay;
+          remainingPayment -= toPay;
+          
+          repaymentDetails.push({ lenderName: line.lenderName || 'Unknown', amount: toPay });
+          
+          if (isEarlyRepayment) {
+            if (line.health.behaviorScore < 90) {
+              line.health.behaviorScore = Math.min(90, line.health.behaviorScore + 5);
+              if (line.health.behaviorScore >= 80) {
+                line.health.riskLevel = 'LOW';
+              }
+            }
+            
+            // Trigger 10% limit increase for early repayment
+            const increaseAmount = Math.floor(line.totalLimit * 0.1);
+            line.totalLimit += increaseAmount;
+            line.availableLimit += increaseAmount;
+            limitIncreases.push({ lenderName: line.lenderName || 'Unknown', amount: increaseAmount });
+            
+            mockLimitHistory.push({
+              id: `LH-${Date.now()}-${line.id}`,
+              date: new Date().toISOString().split('T')[0],
+              previousLimit: line.totalLimit - increaseAmount,
+              newLimit: line.totalLimit,
+              reason: 'Early Repayment Reward'
+            });
           }
         }
       }
+
+      import('./mockData').then(({ updateMockCreditLines }) => {
+        updateMockCreditLines([...mockCreditLines]);
+      });
 
       mockStatement.items.push({
         id: `P-${Math.floor(Math.random() * 1000)}`,
@@ -40,21 +74,7 @@ export const billingApi = {
         amount: -amount
       });
 
-      // Synthetic simulation: trigger limit increase if bill is paid and we're mock testing it
-      if (primaryLine && primaryLine.totalLimit === 5000) {
-        primaryLine.totalLimit = 6000;
-        primaryLine.availableLimit += 1000; // Give them the extra 1000 available
-        
-        mockLimitHistory.push({
-          id: `LH-${Date.now()}`,
-          date: new Date().toISOString().split('T')[0],
-          previousLimit: 5000,
-          newLimit: 6000,
-          reason: 'Consistent Repayment Behavior'
-        });
-      }
-
-      return { success: true, newBalance: mockStatement.totalAmountDue };
+      return { success: true, newBalance: mockStatement.totalAmountDue, repaymentDetails, limitIncreases };
     }
     
     const response = await apiClient.post(`/billing/pay`, { amount });

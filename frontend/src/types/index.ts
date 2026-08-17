@@ -27,6 +27,12 @@ export interface LenderOffer {
   processingFee: number;
 }
 
+export interface SplitAllocation {
+  creditLineId: string;
+  amount: number;
+  interestAmount: number;
+}
+
 export interface CreditLine {
   id: string;
   totalLimit: number;
@@ -51,6 +57,7 @@ export interface Transaction {
   lender?: string;
   interestRate?: number;
   timeline?: { status: string; timestamp: string }[];
+  splits?: { lenderName: string; amount: number }[];
 }
 
 export interface StatementItem {
@@ -59,6 +66,7 @@ export interface StatementItem {
   amount: number;
   description?: string;
   transactionId?: string;
+  lenderName?: string;
 }
 
 export interface Statement {

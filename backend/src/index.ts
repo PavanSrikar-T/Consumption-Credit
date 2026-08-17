@@ -102,9 +102,16 @@ const userCreditLines: CreditLine[] = [
   { id: 'CL3', userId: 'U1', lenderId: 'LENDER_BANK_C', isActive: true, availableLimit: 10000, totalLimit: 10000, interestRate: 18 }
 ];
 
+import { aaRouter } from './api/AARouter';
+import cors from 'cors';
+
 // --- EXPRESS APP ---
 const app = express();
+app.use(cors());
 app.use(bodyParser.json());
+
+// Mount Account Aggregator endpoints
+app.use('/api/v1/aa', aaRouter);
 
 app.post('/api/v1/pay', async (req, res) => {
   const { amount, merchantId } = req.body;

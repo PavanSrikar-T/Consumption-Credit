@@ -1,9 +1,9 @@
 import { isMockMode, delay, apiClient } from './apiClient';
-import { Transaction } from '../types';
+import { Transaction, SplitAllocation } from '../types';
 import { mockTransactions, mockCreditLines, mockStatement } from './mockData';
 
 export const paymentApi = {
-  pay: async (amount: number, merchantId: string, mode: 'OWN_MONEY' | 'CREDIT_LINE', creditLineId?: string): Promise<{ success: boolean; transaction: Transaction; reason?: string }> => {
+  pay: async (amount: number, merchantId: string, mode: 'OWN_MONEY' | 'CREDIT_LINE', creditLineId?: string, totalAmountToDeduct?: number, splits?: SplitAllocation[]): Promise<{ success: boolean; transaction: Transaction; reason?: string }> => {
     if (isMockMode()) {
       await delay(1200);
       
@@ -32,6 +32,9 @@ export const paymentApi = {
         }
         return { success: false, reason: 'High Risk Transaction Declined', transaction: {} as Transaction };
       }
+      
+      const isMultiLender = mode === 'CREDIT_LINE' && splits && splits.length > 0;
+      
       const newTxn: Transaction = {
         id: `TXN-${Math.floor(Math.random() * 10000)}`,
         merchant: merchantId,
@@ -39,11 +42,19 @@ export const paymentApi = {
         mode,
         date: new Date().toISOString(),
         status: 'SETTLED',
-        lender: targetLine ? targetLine.lenderName : undefined,
-        timeline: [
+        lender: isMultiLender ? 'Multiple Lenders' : (targetLine ? targetLine.lenderName : undefined),
+        splits: isMultiLender ? splits.map(s => ({ 
+          lenderName: mockCreditLines.find(c => c.id === s.creditLineId)?.lenderName || 'Unknown', 
+          amount: s.amount 
+        })) : undefined,
+        timeline: mode === 'CREDIT_LINE' ? [
           { status: 'Transaction Created', timestamp: new Date(Date.now() - 5000).toISOString() },
           { status: 'Check Platform Consent', timestamp: new Date(Date.now() - 4500).toISOString() },
           { status: 'Evaluate LENDER', timestamp: new Date(Date.now() - 3000).toISOString() },
+          { status: 'Payment Settled', timestamp: new Date().toISOString() }
+        ] : [
+          { status: 'Transaction Created', timestamp: new Date(Date.now() - 5000).toISOString() },
+          { status: 'Bank Authorization', timestamp: new Date(Date.now() - 2500).toISOString() },
           { status: 'Payment Settled', timestamp: new Date().toISOString() }
         ]
       };
@@ -51,24 +62,47 @@ export const paymentApi = {
       // Push to in-memory mock array so it appears in the list
       mockTransactions.unshift(newTxn);
       
-      // Mutate the mock credit line to simulate limit deduction
-      if (mode === 'CREDIT_LINE' && targetLine) {
-        targetLine.availableLimit -= amount;
-        targetLine.utilizedLimit += amount;
-        
-        // Generate bill
-        mockStatement.totalAmountDue += amount;
-        mockStatement.items.push({
-          id: `I-${Math.floor(Math.random() * 1000)}`,
-          type: 'Credit Line Purchase',
-          amount: amount
-        });
+      if (mode === 'CREDIT_LINE') {
+        if (isMultiLender && splits) {
+          for (const split of splits) {
+            const line = mockCreditLines.find(c => c.id === split.creditLineId);
+            if (line) {
+              const deductAmount = split.amount + split.interestAmount;
+              line.availableLimit -= deductAmount;
+              line.utilizedLimit += deductAmount;
+              
+              mockStatement.totalAmountDue += deductAmount;
+              mockStatement.items.push({
+                id: `I-${Math.floor(Math.random() * 1000)}`,
+                type: 'Split Credit Purchase',
+                amount: deductAmount,
+                description: merchantId,
+                lenderName: line.lenderName
+              });
+            }
+          }
+        } else if (targetLine) {
+          // Mutate the mock credit line to simulate limit deduction
+          const deductAmount = totalAmountToDeduct || amount;
+          targetLine.availableLimit -= deductAmount;
+          targetLine.utilizedLimit += deductAmount;
+          
+          // Generate bill
+          mockStatement.totalAmountDue += deductAmount;
+          mockStatement.items.push({
+            id: `I-${Math.floor(Math.random() * 1000)}`,
+            type: 'Credit Line Purchase',
+            amount: deductAmount,
+            description: merchantId,
+            lenderName: targetLine.lenderName
+          });
 
-        // Set as active/primary credit line on dashboard
-        const index = mockCreditLines.findIndex(c => c.id === targetLine.id);
-        if (index > 0) {
-          mockCreditLines.splice(index, 1);
-          mockCreditLines.unshift(targetLine);
+          // Set as active/primary credit line on dashboard
+          const index = mockCreditLines.findIndex(c => c.id === targetLine.id);
+          if (index > 0) {
+            mockCreditLines.splice(index, 1);
+            mockCreditLines.unshift(targetLine);
+          }
         }
       }
 

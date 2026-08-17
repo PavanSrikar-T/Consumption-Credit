@@ -16,7 +16,7 @@ export const TransactionCard: React.FC<Props> = ({ transaction, onClick }) => {
       <div>
         <p className="font-semibold text-fintech-primary">{transaction.merchant}</p>
         <p className="text-xs text-fintech-secondary">
-          {new Date(transaction.date).toLocaleDateString()} • {transaction.mode.replace('_', ' ')}
+          {new Date(transaction.date).toLocaleDateString()} • {transaction.mode === 'OWN_MONEY' ? 'Paid with Own Money' : (transaction.lender ? `Paid via ${transaction.lender}` : 'Credit Line')}
         </p>
       </div>
       <div className="text-right flex flex-col items-end gap-1">

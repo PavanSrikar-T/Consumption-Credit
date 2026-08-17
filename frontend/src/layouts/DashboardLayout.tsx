@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate, Navigate } from 'react-router-dom';
-import { LayoutDashboard, CreditCard, Activity, ReceiptText, ShieldCheck, Shield, Send, Clock, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, CreditCard, Activity, ReceiptText, ShieldCheck, Shield, Send, Clock, ShieldAlert, Database, Target, Landmark, FileSearch } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { creditApi } from '../api/creditApi';
 
@@ -11,13 +11,18 @@ export const DashboardLayout = () => {
 
   useEffect(() => {
     if (user) {
-      creditApi.getCreditStatus(user.id).then((data) => {
-        if (!data) {
+      creditApi.getCreditStatus(user.id)
+        .then((data) => {
+          if (!data) {
+            navigate('/onboarding');
+          } else {
+            setIsChecking(false);
+          }
+        })
+        .catch(() => {
+          // If no credit line exists, it rejects
           navigate('/onboarding');
-        } else {
-          setIsChecking(false);
-        }
-      });
+        });
     }
   }, [user, navigate]);
 
@@ -31,12 +36,14 @@ export const DashboardLayout = () => {
 
   const navItems = [
     { to: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
+    { to: '/credit-check', icon: <FileSearch size={20} />, label: 'Credit Check' },
+    { to: '/marketplace', icon: <Landmark size={20} />, label: 'Lenders Marketplace' },
     { to: '/pay', icon: <Send size={20} />, label: 'Pay' },
     { to: '/transactions', icon: <Clock size={20} />, label: 'Transactions' },
     { to: '/bills', icon: <ReceiptText size={20} />, label: 'Bills' },
     { to: '/credit-health', icon: <Activity size={20} />, label: 'Credit Health' },
     { to: '/security', icon: <ShieldCheck size={20} />, label: 'Security' },
-    { to: '/risk-logs', icon: <ShieldAlert size={20} />, label: 'Risk Logs (Admin)' }
+    { to: '/aa', icon: <Database size={20} />, label: 'AA Details' }
   ];
 
   return (

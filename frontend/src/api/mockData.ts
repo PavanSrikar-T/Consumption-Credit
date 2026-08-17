@@ -1,13 +1,25 @@
 import { CreditLine, Transaction, Statement, ConsentRecord, LimitHistoryRecord } from '../types';
 
-export let mockCreditLines: CreditLine[] = [];
+export let mockCreditLines: CreditLine[] = (() => {
+  try {
+    const stored = localStorage.getItem('super_money_mock_credit');
+    if (stored) return JSON.parse(stored);
+  } catch (e) {}
+  return [];
+})();
 
 export const resetCreditLine = () => {
   mockCreditLines = [];
+  localStorage.removeItem('super_money_mock_credit');
+};
+
+export const updateMockCreditLines = (lines: CreditLine[]) => {
+  mockCreditLines = lines;
+  localStorage.setItem('super_money_mock_credit', JSON.stringify(mockCreditLines));
 };
 
 export const initializeCreditLines = (banks: { name: string; approvedLimit: number; interestRate: number }[], score: number) => {
-  mockCreditLines = banks.map((bank, idx) => ({
+  const newLines = banks.map((bank, idx) => ({
     id: `CL-${12345 + idx}`,
     userId: 'U1',
     totalLimit: bank.approvedLimit,
@@ -16,8 +28,8 @@ export const initializeCreditLines = (banks: { name: string; approvedLimit: numb
     lenderName: bank.name,
     interestRate: bank.interestRate,
     health: {
-      behaviorScore: score,
-      riskLevel: score > 80 ? 'LOW' : score > 60 ? 'MEDIUM' : 'HIGH',
+      behaviorScore: Math.min(90, score),
+      riskLevel: Math.min(90, score) >= 80 ? 'LOW' : Math.min(90, score) >= 60 ? 'MEDIUM' : 'HIGH',
       recommendedLimit: bank.approvedLimit * 1.2,
       currentLimit: bank.approvedLimit,
       factors: [
@@ -28,10 +40,11 @@ export const initializeCreditLines = (banks: { name: string; approvedLimit: numb
       ]
     },
     nextPaymentDue: {
-      amount: 2100,
+      amount: 0,
       date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 15).toISOString().split('T')[0]
     }
   }));
+  updateMockCreditLines(newLines);
 };
 
 export const mockTransactions: Transaction[] = [
@@ -71,25 +84,10 @@ export const mockTransactions: Transaction[] = [
 
 export const mockStatement: Statement = {
   id: 'STMT-CURRENT',
-  totalAmountDue: 2100.00, // Swiggy + Amazon
-  minAmountDue: 210.00,
-  dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 15).toISOString().split('T')[0], // 15 days from now
-  items: [
-    {
-      id: 'ITEM-1',
-      transactionId: 'TXN-1001',
-      type: 'Credit Line',
-      amount: 850.00,
-      description: 'Swiggy'
-    },
-    {
-      id: 'ITEM-2',
-      transactionId: 'TXN-1002',
-      type: 'Credit Line',
-      amount: 1250.00,
-      description: 'Amazon India'
-    }
-  ]
+  totalAmountDue: 0.00,
+  minAmountDue: 0.00,
+  dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 15).toISOString().split('T')[0],
+  items: []
 };
 
 export const mockConsentHistory: ConsentRecord[] = [

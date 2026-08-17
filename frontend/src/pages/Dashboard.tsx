@@ -11,7 +11,7 @@ import { Link } from 'react-router-dom';
 
 export const Dashboard = () => {
   const { user } = useAuth();
-  const [creditInfo, setCreditInfo] = useState<CreditLine | null>(null);
+  const [creditLines, setCreditLines] = useState<CreditLine[]>([]);
   const [recentTxns, setRecentTxns] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,18 +20,19 @@ export const Dashboard = () => {
   const [requestingEmergency, setRequestingEmergency] = useState(false);
   const [emergencyAmount, setEmergencyAmount] = useState('5000');
   const [emergencySuccess, setEmergencySuccess] = useState(false);
+  const [emergencyTargetId, setEmergencyTargetId] = useState<string>('');
 
   const handleEmergencyRequest = async () => {
-    if (!user || !creditInfo) return;
+    if (!user || !emergencyTargetId) return;
     setRequestingEmergency(true);
     try {
-      const res = await creditApi.requestEmergencyLimit(user.id, Number(emergencyAmount));
-      setCreditInfo(prev => prev ? { 
-        ...prev, 
-        totalLimit: res.newLimit, 
-        availableLimit: prev.availableLimit + Number(emergencyAmount),
+      const res = await creditApi.requestEmergencyLimit(user.id, Number(emergencyAmount), emergencyTargetId);
+      setCreditLines(prev => prev.map(line => line.id === emergencyTargetId ? {
+        ...line,
+        totalLimit: res.newLimit,
+        availableLimit: line.availableLimit + Number(emergencyAmount),
         interestRate: res.newInterestRate
-      } : prev);
+      } : line));
       setEmergencySuccess(true);
     } catch (e) {
       console.error(e);
@@ -44,11 +45,11 @@ export const Dashboard = () => {
     if (!user) return;
     const fetchData = async () => {
       try {
-        const [credit, txns] = await Promise.all([
-          creditApi.getCreditStatus(user.id),
+        const [lines, txns] = await Promise.all([
+          creditApi.getAllCreditLines(user.id),
           transactionApi.getTransactions(user.id)
         ]);
-        setCreditInfo(credit);
+        setCreditLines(lines);
         setRecentTxns(txns.slice(0, 3)); // top 3
       } catch (e) {
         console.error(e);
@@ -60,7 +61,10 @@ export const Dashboard = () => {
   }, [user]);
 
   if (loading) return <div className="p-8 text-center text-fintech-secondary">Loading your dashboard...</div>;
-  if (!creditInfo) return <div className="p-8 text-center text-fintech-danger">Failed to load credit data.</div>;
+  if (!creditLines || creditLines.length === 0) return <div className="p-8 text-center text-fintech-danger">Failed to load credit data.</div>;
+
+  const combinedNextPaymentDue = creditLines.reduce((acc, line) => acc + (line.nextPaymentDue?.amount || 0), 0);
+  const primaryLine = creditLines[0];
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
@@ -69,59 +73,59 @@ export const Dashboard = () => {
         <p className="text-fintech-secondary">Here is your ConsumptionCredit summary.</p>
       </header>
 
-      {/* Main Credit Card overview */}
-      <Card className="bg-gradient-to-br from-fintech-primary to-fintech-accent text-white border-none shadow-xl">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <p className="text-gray-300 text-sm">Available Limit</p>
-            <div className="flex justify-between items-end gap-6 mt-1">
-              <h2 className="text-4xl font-bold">₹{creditInfo.availableLimit.toLocaleString()}</h2>
+      <div className="flex gap-4 overflow-x-auto pb-4 snap-x hide-scrollbar">
+        {creditLines.map(creditInfo => (
+          <Card key={creditInfo.id} className="min-w-[340px] flex-1 snap-start bg-gradient-to-br from-fintech-primary to-fintech-accent text-white border-none shadow-xl flex flex-col">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <p className="text-gray-300 text-sm">Available Limit</p>
+                <h2 className="text-4xl font-bold mt-1">₹{creditInfo.availableLimit.toLocaleString()}</h2>
+              </div>
               {creditInfo.lenderName && (
-                <div className="text-right mb-1">
-                  <p className="text-[10px] text-emerald-300 font-medium uppercase tracking-wider mb-0.5">Provided By</p>
-                  <p className="text-sm font-bold text-white bg-white/10 px-2 py-0.5 rounded border border-white/20">
+                <div className="text-right shrink-0 ml-4">
+                  <p className="text-[10px] text-emerald-300 font-medium uppercase tracking-wider mb-1">Provided By</p>
+                  <p className="text-sm font-bold text-white whitespace-nowrap bg-white/10 px-2 py-1 rounded border border-white/20">
                     {creditInfo.lenderName}
                   </p>
                 </div>
               )}
             </div>
-          </div>
-          <div className="text-right">
-            <p className="text-gray-300 text-sm">Credit Limit</p>
-            <p className="font-semibold text-lg">₹{creditInfo.totalLimit.toLocaleString()}</p>
-          </div>
-        </div>
-        
-        <div className="bg-white/10 rounded-xl p-4 mb-4 backdrop-blur-sm">
-          <CreditUtilizationBar total={creditInfo.totalLimit} used={creditInfo.utilizedLimit} />
-        </div>
+            
+            <div className="bg-white/10 rounded-xl p-4 mb-4 backdrop-blur-sm">
+              <CreditUtilizationBar total={creditInfo.totalLimit} used={creditInfo.utilizedLimit} />
+            </div>
 
-        <div className="flex gap-4">
-          <Link to="/pay" className="flex-1 bg-white text-fintech-primary text-center py-2.5 rounded-lg font-medium hover:bg-gray-100 transition">
-            Pay Now
-          </Link>
-          <Link to="/bills" className="flex-1 bg-white/20 text-white border border-white/30 text-center py-2.5 rounded-lg font-medium hover:bg-white/30 transition">
-            View Bill
-          </Link>
-        </div>
+            <div className="mt-auto pt-4 border-t border-white/20">
+              <button 
+                onClick={() => {
+                  setEmergencyTargetId(creditInfo.id);
+                  setShowEmergencyModal(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-rose-500/20 text-rose-200 border border-rose-500/30 hover:bg-rose-500/30 transition py-2.5 rounded-lg font-medium text-sm"
+              >
+                <AlertTriangle size={16} /> Request Emergency Package
+              </button>
+            </div>
+          </Card>
+        ))}
+      </div>
 
-        <div className="mt-4 pt-4 border-t border-white/20">
-          <button 
-            onClick={() => setShowEmergencyModal(true)}
-            className="w-full flex items-center justify-center gap-2 bg-rose-500/20 text-rose-200 border border-rose-500/30 hover:bg-rose-500/30 transition py-2.5 rounded-lg font-medium text-sm"
-          >
-            <AlertTriangle size={16} /> Request Emergency Package
-          </button>
-        </div>
-      </Card>
+      <div className="flex gap-4">
+        <Link to="/pay" className="flex-1 bg-fintech-primary text-white text-center py-3 rounded-lg font-bold hover:bg-slate-800 transition">
+          Pay Now
+        </Link>
+        <Link to="/bills" className="flex-1 bg-white border-2 border-fintech-primary text-fintech-primary text-center py-3 rounded-lg font-bold hover:bg-gray-50 transition">
+          View Unified Bill
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="flex items-center gap-4 hover:shadow-md transition">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-full"><Calendar size={24} /></div>
           <div>
-            <p className="text-sm text-fintech-secondary">Next Payment Due</p>
-            <p className="font-bold text-lg">₹{creditInfo.nextPaymentDue?.amount.toLocaleString()}</p>
-            <p className="text-xs text-fintech-secondary">Due by {creditInfo.nextPaymentDue?.date}</p>
+            <p className="text-sm text-fintech-secondary">Unified Next Payment Due</p>
+            <p className="font-bold text-lg">₹{combinedNextPaymentDue.toLocaleString()}</p>
+            <p className="text-xs text-fintech-secondary">Due by {primaryLine.nextPaymentDue?.date}</p>
           </div>
         </Card>
 
@@ -131,8 +135,8 @@ export const Dashboard = () => {
             <div>
               <p className="text-sm text-fintech-secondary">Credit Line Score</p>
               <div className="flex items-baseline gap-2">
-                <p className="font-bold text-lg text-green-700">{creditInfo.health.behaviorScore}/100</p>
-                <span className="text-xs font-medium text-green-600 uppercase">({creditInfo.health.riskLevel} RISK)</span>
+                <p className="font-bold text-lg text-green-700">{Math.min(90, primaryLine.health.behaviorScore)}/100</p>
+                <span className="text-xs font-medium text-green-600 uppercase">({primaryLine.health.riskLevel} RISK)</span>
               </div>
             </div>
           </Card>
@@ -180,7 +184,7 @@ export const Dashboard = () => {
               <div className="text-center py-4">
                 <div className="bg-green-50 text-green-700 p-4 rounded-xl border border-green-200 mb-6">
                   <p className="font-bold">Emergency Limit Approved!</p>
-                  <p className="text-sm mt-1">Your new limit is ₹{creditInfo?.totalLimit.toLocaleString()}</p>
+                  <p className="text-sm mt-1">Your new limit is active.</p>
                 </div>
                 <button 
                   onClick={() => { setShowEmergencyModal(false); setEmergencySuccess(false); }}
@@ -206,7 +210,7 @@ export const Dashboard = () => {
 
                 <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs font-medium flex gap-2 items-start">
                   <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                  <p>By proceeding, you agree to a higher interest rate ({creditInfo ? creditInfo.interestRate + 5 : ''}% p.a.) on all future utilizations.</p>
+                  <p>By proceeding, you agree to a higher interest rate (+5% p.a.) on all future utilizations.</p>
                 </div>
 
                 <button

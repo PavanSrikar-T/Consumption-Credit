@@ -11,6 +11,8 @@ export const Bills = () => {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [repaymentDetails, setRepaymentDetails] = useState<{ lenderName: string; amount: number }[] | undefined>();
+  const [limitIncreases, setLimitIncreases] = useState<{ lenderName: string; amount: number }[] | undefined>();
 
   useEffect(() => {
     if (user) {
@@ -30,12 +32,18 @@ export const Bills = () => {
 
     setPaying(true);
     try {
-      await billingApi.payBill(amount);
+      const result = await billingApi.payBill(amount);
       setSuccess(true);
+      if (result.repaymentDetails) {
+        setRepaymentDetails(result.repaymentDetails);
+      }
+      if (result.limitIncreases) {
+        setLimitIncreases(result.limitIncreases);
+      }
       setStatement({ 
         ...statement, 
-        totalAmountDue: Math.max(0, statement.totalAmountDue - amount),
-        minAmountDue: amountToPay ? statement.minAmountDue : 0 
+        totalAmountDue: result.newBalance,
+        minAmountDue: Math.max(0, statement.minAmountDue - amount)
       }); 
       setCustomAmount('');
     } catch (e) {
@@ -58,6 +66,23 @@ export const Bills = () => {
           <div>
             <p className="font-bold">Payment Successful!</p>
             <p className="text-sm">Your bill payment has been processed.</p>
+            {repaymentDetails && repaymentDetails.length > 0 && (
+              <ul className="mt-2 text-xs list-disc pl-4 opacity-80 space-y-1">
+                {repaymentDetails.map((rd, i) => (
+                  <li key={i}>Cleared ₹{rd.amount.toLocaleString()} from {rd.lenderName}</li>
+                ))}
+              </ul>
+            )}
+            {limitIncreases && limitIncreases.length > 0 && (
+              <div className="mt-3 bg-white/50 p-2 rounded text-sm text-green-800">
+                <p className="font-bold mb-1 flex items-center gap-1">🎉 Early Repayment Reward!</p>
+                <ul className="text-xs list-disc pl-4 opacity-90 space-y-1">
+                  {limitIncreases.map((li, i) => (
+                    <li key={i}>Credit Limit with {li.lenderName} increased by ₹{li.amount.toLocaleString()}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -66,7 +91,7 @@ export const Bills = () => {
         <p className="text-gray-300 text-sm mb-1">Total Amount Due</p>
         <h2 className="text-4xl font-bold mb-4">₹{statement.totalAmountDue.toLocaleString()}</h2>
         
-        {statement.totalAmountDue > 0 && (
+        {statement.totalAmountDue > 0 ? (
           <>
             <div className="flex justify-between items-center bg-white/10 p-3 rounded-lg text-sm mb-6">
               <span>Due Date</span>
@@ -106,6 +131,11 @@ export const Bills = () => {
               </div>
             </div>
           </>
+        ) : (
+          <div className="bg-white/10 p-4 rounded-xl flex items-center justify-center gap-3 mt-2">
+            <CheckCircle2 className="text-green-400 w-6 h-6" />
+            <span className="font-medium text-white">All caught up! No pending bills.</span>
+          </div>
         )}
       </Card>
 
@@ -117,7 +147,9 @@ export const Bills = () => {
               <div key={item.id} className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-fintech-primary font-medium">{item.description || item.type}</span>
-                  {item.description && <span className="text-xs text-fintech-secondary">{item.type}</span>}
+                  <span className="text-xs text-fintech-secondary">
+                    {item.type} {item.lenderName ? `• ${item.lenderName}` : ''}
+                  </span>
                 </div>
                 <span className="font-bold text-fintech-primary">₹{item.amount.toLocaleString()}</span>
               </div>

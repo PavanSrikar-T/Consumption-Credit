@@ -12,9 +12,12 @@ import { Transactions } from './pages/Transactions';
 import { TransactionDetails } from './pages/TransactionDetails';
 import { Bills } from './pages/Bills';
 import { CreditHealth } from './pages/CreditHealth';
+import { CreditCheck } from './pages/CreditCheck';
+import { LendersMarketplace } from './pages/LendersMarketplace';
 import { LimitHistory } from './pages/LimitHistory';
 import { Security } from './pages/Security';
 import { RiskLogs } from './pages/RiskLogs';
+import { AccountAggregator } from './pages/AccountAggregator';
 
 function App() {
   return (
@@ -30,9 +33,12 @@ function App() {
             <Route path="transactions/:id" element={<TransactionDetails />} />
             <Route path="bills" element={<Bills />} />
             <Route path="credit-health" element={<CreditHealth />} />
+            <Route path="credit-check" element={<CreditCheck />} />
+            <Route path="marketplace" element={<LendersMarketplace />} />
             <Route path="credit-health/history" element={<LimitHistory />} />
             <Route path="security" element={<Security />} />
             <Route path="risk-logs" element={<RiskLogs />} />
+            <Route path="aa" element={<AccountAggregator />} />
           </Route>
         </Routes>
       </BrowserRouter>

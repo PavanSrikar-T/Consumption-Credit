@@ -50,7 +50,7 @@ export const TransactionDetails = () => {
           </div>
           <div className="flex justify-between">
             <span className="text-fintech-secondary">Payment Mode</span>
-            <span className="font-medium text-fintech-primary">{txn.mode.replace('_', ' ')}</span>
+            <span className="font-medium text-fintech-primary">{txn.mode === 'OWN_MONEY' ? 'Paid with Own Money' : 'Credit Line'}</span>
           </div>
           {txn.lender && (
             <div className="flex justify-between">
@@ -60,6 +60,20 @@ export const TransactionDetails = () => {
           )}
         </div>
       </Card>
+
+      {txn.splits && txn.splits.length > 0 && (
+        <Card>
+          <h3 className="font-bold text-fintech-primary mb-4 border-b pb-2">Split Breakdown</h3>
+          <div className="space-y-3 text-sm">
+            {txn.splits.map((s, i) => (
+              <div key={i} className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                <span className="text-fintech-secondary font-medium">{s.lenderName}</span>
+                <span className="font-bold text-fintech-primary">₹{s.amount.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {txn.timeline && txn.timeline.length > 0 && (
         <Card>
