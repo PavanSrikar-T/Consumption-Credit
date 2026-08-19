@@ -42,8 +42,7 @@ export const DashboardLayout = () => {
     { to: '/transactions', icon: <Clock size={20} />, label: 'Transactions' },
     { to: '/bills', icon: <ReceiptText size={20} />, label: 'Bills' },
     { to: '/credit-health', icon: <Activity size={20} />, label: 'Credit Health' },
-    { to: '/security', icon: <ShieldCheck size={20} />, label: 'Security' },
-    { to: '/aa', icon: <Database size={20} />, label: 'AA Details' }
+    { to: '/security', icon: <ShieldCheck size={20} />, label: 'Security' }
   ];
 
   return (

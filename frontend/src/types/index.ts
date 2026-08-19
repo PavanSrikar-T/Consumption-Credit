@@ -45,6 +45,10 @@ export interface CreditLine {
     amount: number;
     date: string;
   };
+  hasRequestedEmergency?: boolean;
+  lastEmergencyRequestDate?: string;
+  emergencySecurityType?: string;
+  emergencySecurityDetails?: string;
 }
 
 export interface Transaction {

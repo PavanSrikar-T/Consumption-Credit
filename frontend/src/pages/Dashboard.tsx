@@ -21,21 +21,38 @@ export const Dashboard = () => {
   const [emergencyAmount, setEmergencyAmount] = useState('5000');
   const [emergencySuccess, setEmergencySuccess] = useState(false);
   const [emergencyTargetId, setEmergencyTargetId] = useState<string>('');
+  const [emergencySecurityType, setEmergencySecurityType] = useState('Guarantor');
+  const [emergencySecurityDetails, setEmergencySecurityDetails] = useState('');
+
+  const isEmergencyAllowed = (line: any) => {
+    if (line.hasRequestedEmergency && !line.lastEmergencyRequestDate) return false;
+    if (line.lastEmergencyRequestDate) {
+      const diffTime = Math.abs(new Date().getTime() - new Date(line.lastEmergencyRequestDate).getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays >= 30;
+    }
+    return true;
+  };
 
   const handleEmergencyRequest = async () => {
     if (!user || !emergencyTargetId) return;
     setRequestingEmergency(true);
     try {
-      const res = await creditApi.requestEmergencyLimit(user.id, Number(emergencyAmount), emergencyTargetId);
+      const res = await creditApi.requestEmergencyLimit(user.id, Number(emergencyAmount), emergencyTargetId, emergencySecurityType, emergencySecurityDetails);
       setCreditLines(prev => prev.map(line => line.id === emergencyTargetId ? {
         ...line,
         totalLimit: res.newLimit,
         availableLimit: line.availableLimit + Number(emergencyAmount),
-        interestRate: res.newInterestRate
+        interestRate: res.newInterestRate,
+        hasRequestedEmergency: true,
+        lastEmergencyRequestDate: new Date().toISOString(),
+        emergencySecurityType,
+        emergencySecurityDetails
       } : line));
       setEmergencySuccess(true);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert(e.message || 'Failed to request emergency package.');
     } finally {
       setRequestingEmergency(false);
     }
@@ -98,12 +115,20 @@ export const Dashboard = () => {
             <div className="mt-auto pt-4 border-t border-white/20">
               <button 
                 onClick={() => {
+                  if (!isEmergencyAllowed(creditInfo)) return;
                   setEmergencyTargetId(creditInfo.id);
                   setShowEmergencyModal(true);
+                  setEmergencySecurityType('Guarantor');
+                  setEmergencySecurityDetails('');
                 }}
-                className="w-full flex items-center justify-center gap-2 bg-rose-500/20 text-rose-200 border border-rose-500/30 hover:bg-rose-500/30 transition py-2.5 rounded-lg font-medium text-sm"
+                disabled={!isEmergencyAllowed(creditInfo)}
+                className={`w-full flex items-center justify-center gap-2 transition py-2.5 rounded-lg font-medium text-sm ${
+                  !isEmergencyAllowed(creditInfo)
+                  ? 'bg-gray-500/20 text-gray-400 border border-gray-500/30 cursor-not-allowed' 
+                  : 'bg-rose-500/20 text-rose-200 border border-rose-500/30 hover:bg-rose-500/30'
+                }`}
               >
-                <AlertTriangle size={16} /> Request Emergency Package
+                <AlertTriangle size={16} /> {!isEmergencyAllowed(creditInfo) ? 'Used within 30 days' : 'Request Emergency Package'}
               </button>
             </div>
           </Card>
@@ -206,6 +231,30 @@ export const Dashboard = () => {
                     <option value="10000">₹10,000 Extra</option>
                     <option value="25000">₹25,000 Extra</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Security Type</label>
+                  <select 
+                    value={emergencySecurityType} 
+                    onChange={(e) => setEmergencySecurityType(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition bg-white"
+                  >
+                    <option value="Guarantor">Guarantor</option>
+                    <option value="Fixed Deposit">Fixed Deposit</option>
+                    <option value="Vehicle">Vehicle</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Security Details</label>
+                  <input 
+                    type="text"
+                    value={emergencySecurityDetails} 
+                    onChange={(e) => setEmergencySecurityDetails(e.target.value)}
+                    placeholder="Enter relevant details (e.g., account no, name)"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition bg-white"
+                  />
                 </div>
 
                 <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs font-medium flex gap-2 items-start">

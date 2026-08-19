@@ -32,14 +32,32 @@ export const creditApi = {
     return response.data;
   },
 
-  requestEmergencyLimit: async (userId: string, additionalAmount: number): Promise<{ success: boolean; newLimit: number; newInterestRate: number }> => {
+  requestEmergencyLimit: async (userId: string, additionalAmount: number, targetId: string, securityType?: string, securityDetails?: string): Promise<{ success: boolean; newLimit: number; newInterestRate: number }> => {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
-        if (mockCreditLines.length > 0) {
-          const primaryLine = mockCreditLines[0];
+        const primaryLine = mockCreditLines.find(line => line.id === targetId) || mockCreditLines[0];
+        if (primaryLine) {
+          if (primaryLine.lastEmergencyRequestDate) {
+            const lastDate = new Date(primaryLine.lastEmergencyRequestDate);
+            const now = new Date();
+            const diffTime = Math.abs(now.getTime() - lastDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays < 30) {
+              return reject(new Error('Emergency limit can only be requested once per 30 days.'));
+            }
+          }
+
+          if (!securityType) {
+            return reject(new Error('Security type is required for emergency package.'));
+          }
+
           primaryLine.totalLimit += additionalAmount;
           primaryLine.availableLimit += additionalAmount;
-          primaryLine.interestRate += 5; // e.g., penalty of +5% interest rate for emergency
+          primaryLine.interestRate = (primaryLine.interestRate || 0) + 5; // e.g., penalty of +5% interest rate for emergency
+          primaryLine.hasRequestedEmergency = true;
+          primaryLine.lastEmergencyRequestDate = new Date().toISOString();
+          primaryLine.emergencySecurityType = securityType;
+          primaryLine.emergencySecurityDetails = securityDetails;
           
           mockLimitHistory.push({
             id: `LH-${Date.now()}`,

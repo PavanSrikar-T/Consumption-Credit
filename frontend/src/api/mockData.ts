@@ -29,7 +29,7 @@ export const initializeCreditLines = (banks: { name: string; approvedLimit: numb
     interestRate: bank.interestRate,
     health: {
       behaviorScore: Math.min(90, score),
-      riskLevel: Math.min(90, score) >= 80 ? 'LOW' : Math.min(90, score) >= 60 ? 'MEDIUM' : 'HIGH',
+      riskLevel: (Math.min(90, score) >= 80 ? 'LOW' : Math.min(90, score) >= 60 ? 'MEDIUM' : 'HIGH') as 'LOW' | 'MEDIUM' | 'HIGH',
       recommendedLimit: bank.approvedLimit * 1.2,
       currentLimit: bank.approvedLimit,
       factors: [
